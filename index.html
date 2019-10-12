@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>GIFT: Learning Transformation-Invariant Dense Visual Descriptors via Group CNNs</title>
+
+  <style type="text/css">
+    body {
+      margin: 0px;
+      background-color: #F3F3F3;
+      font-family: 'PT Sans', 'Arial';
+    }
+    h1 {
+      text-align: center;
+      color: #444444;
+      font-size: 36px;
+      margin-top:50px;
+      margin-bottom: 0px;
+    }
+    h2 {
+      margin-top: 120px;
+      margin-bottom: 10px;
+      color: #FFCF43;
+      font-size: 30px;
+    }
+    #headerdiv {
+      width: 1150px;
+      margin: auto;
+    }
+    #maincontent {
+      width: 1000px;
+      margin: auto;
+      height: 340px;
+    }
+    #suppcontent {
+      padding-top: 0px;
+      background-color: black;
+      color: #BBBBBB;
+      font-size: 16px;
+    }
+    
+    #content {
+      width: 1000px;
+      margin: auto;
+    }
+    td {
+      vertical-align: top;
+      text-align: center;
+    }
+    .desc {
+      color: #888888;
+    }
+    .center {
+      display: block;
+      width: 100%;
+      text-align: center;
+    }
+    .nips {
+      text-align: center;
+      margin-top: 0px;
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+    .nips a {
+      color: #777777;
+    }
+    .google {
+      text-align: center;
+      margin-top: 2px;
+      font-size: 15px;
+    }
+    .google a {
+      color: #204c87;
+    }
+    .center {
+      text-align: center;
+    }
+    .authors {
+      text-align: center;
+    }
+    .author {
+      margin-right: 45px;
+      font-size: 21px;
+    }
+    .author a {
+      color: #3376cb;
+    }
+    #abstract {
+      line-height: 1.3;
+      width: 1000px;
+      font-size: 16px;
+    }
+    h2 {
+      color: #666666;
+      margin-top: 70px;
+    }
+    h1.supp {
+      padding-top: 40px;
+      margin-top: 0;
+      color:#aaaaaa;
+      font-size:40px;
+      margin-bottom: 20px;
+    }
+    h2.abstract {
+      color: #555555;
+      margin-top: 0px;
+    }
+    #files {
+      color: #555555;
+      margin-top: 20px;
+      font-size: 25px;
+    }
+    #files a {
+      text-decoration: None;
+      color: #3376cb;
+    }
+    a {
+      text-decoration: none;
+    }
+  </style>
+
+  <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1">
+  <link href="css/frame.css" media="screen" rel="stylesheet" type="text/css" />
+  <link href="css/controls.css" media="screen" rel="stylesheet" type="text/css" />
+  <link href="css/custom.css" media="screen" rel="stylesheet" type="text/css" />
+  <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+  <link href='https://fonts.googleapis.com/css?family=Open+Sans+Condensed:300,700' rel='stylesheet' type='text/css'>
+  <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,700" rel="stylesheet">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <style>
+    .menu-index {
+      color: rgb(255, 255, 255) !important;
+      opacity: 1 !important;
+      font-weight: 700 !important;
+    }
+  </style>
+</head>
+
+<body>
+        <!--Start Intro-->
+<div id="headerdiv">
+  <h1>
+  GIFT: Learning Transformation-Invariant <br> Dense Visual Descriptors via Group CNNs
+  </h1>
+  <div class="nips"><a href="http://cvpr2019.thecvf.com/">NeurIPS 2019</a></div>
+</div>
+  <div id="maincontent">
+  <div class="authors" style="margin-top: 10px">
+  <span class="author"><a href="https://liuyuan-pal.github.io/">Yuan Liu</a></span>
+  <span class="author"><a href="https://zehongs.github.io/">Zehong Shen</a></span>
+  <span class="author">Zhixuan Lin<sup></sup></a></span>
+  <span class="author"><a href="https://pengsida.net">Sida Peng</a></span>
+  <span class="author"><a href="http://www.cad.zju.edu.cn/home/xzhou/">Xiaowei Zhou</a><sup>* </sup></span>
+  <span class="author">Hujun Bao<sup>* </sup></a></span>
+  </div>
+<div class="google" style="margin-top: 10px">State Key Lab of CAD&CG, ZJU-Sensetime Joint Lab of 3D Vision, Zhejiang University &nbsp;&nbsp;&nbsp;&nbsp;</div>
+<div class="google" style="margin-top: 5px">* Corresponding authors</div>
+  
+<div class="flex-item flex-column">
+
+
+<div class="content">
+<div class="content-table">
+<div class="flex-row">
+<div id="abstract">
+    <h2 class="abstract"> Abstract </h2>
+    Finding correspondences between images with large viewpoint changes requires local descriptors that are robust against geometric transformations. An approach for transformation invariance is to integrate out the transformations by pooling the features extracted from transformed versions of the original images.
+    However, the feature pooling may sacrifice the distinctiveness of the resulting descriptors. In this paper, we introduce a novel visual descriptor named Group Invariant Feature Transform (GIFT), which is both discriminative and robust to geometric transformations. The key idea is that the features extracted from transformed images can be viewed as a function defined on the group of transformations. Instead of pooling, we use group convolutions to exploit underlying structures of the extracted features on the group, resulting in descriptors that are both discriminative and provably invariant to the group of transformations.  
+    Extensive experiments show that GIFT outperforms state-of-the-art methods on the HPSequence dataset, the SUN3D dataset and new datasets with large scale and orientation variations.
+</div>
+    <div id="files" class="center" style="margin-top: 10px">
+      [<a href="">Paper</a>]&nbsp;&nbsp;&nbsp;
+      [<a href="">Supplementary Material</a>]&nbsp;&nbsp;&nbsp;
+      [<a href="https://github.com/zju3dv/GIFT">Code</a>]&nbsp;&nbsp;&nbsp;
+      [<a href="">Pretrained Model</a>]&nbsp;&nbsp;&nbsp;
+    </div>
+  </div>
+  </div>
+  </div>
+</div>
+
+</body>
+
+</html>
