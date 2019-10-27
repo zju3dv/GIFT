@@ -5,9 +5,15 @@ sample_rotate_begin: -90
 sample_rotate_inter: 45 # 30
 sample_rotate_num: 5   # 7
 
-hem_interval: 16
 
-batch_size: 2
+extractor: "NetworkShallow"
+embedder: "None"
+
+hem_interval: 16
+loss_type: "gfeats"
+loss_margin: 0.5
+
+batch_size: 1
 worker_num: 4
 
 augmentation_args:

@@ -11,7 +11,8 @@ from dataset.homography import compute_similar_affine_batch, sample_homography_v
 from dataset.photometric_augmentation import *
 from dataset.transformer import TransformerCV
 from utils.augmentation_utils import add_noise, gaussian_blur, jpeg_compress, random_rotate_img
-from utils.base_utils import gray_repeats
+from utils.base_utils import gray_repeats, get_rot_m
+
 
 class CorrespondenceDataset(Dataset):
     def __init__(self, train_cfg, database):
@@ -132,13 +133,16 @@ class CorrespondenceDataset(Dataset):
         # begin=time.time()
         img_list0,pts_list0,grid_list0=self.transformer.postprocess_transformed_results(results0,True)
         img_list1,pts_list1,grid_list1=self.transformer.postprocess_transformed_results(results1,True)
+
+        pix_pos0=torch.tensor(pix_pos0,dtype=torch.float32)
+        pix_pos1=torch.tensor(pix_pos1,dtype=torch.float32)
         scale_offset=torch.tensor(scale_offset,dtype=torch.int32)
         rotate_offset=torch.tensor(rotate_offset,dtype=torch.int32)
         H=torch.tensor(H,dtype=torch.float32)
         # print('totensor cost {} s'.format(time.time()-begin))
         # self.times[3] += time.time() - begin
 
-        return img_list0,pts_list0,grid_list0,img_list1,pts_list1,grid_list1,scale_offset,rotate_offset,H
+        return img_list0,pts_list0,pix_pos0,grid_list0,img_list1,pts_list1,pix_pos1,grid_list1,scale_offset,rotate_offset,H
 
     def add_homography_background(self, img, cur_path, H):
         bpth = self.generate_background_pth(cur_path)
@@ -257,6 +261,12 @@ class CorrespondenceDataset(Dataset):
         return bpth
 
     def generate_homography(self):
+        # return np.asarray([[2.0,0.0,0.0],[0.0,2.0,0.0],[0.0,0.0,1.0]],dtype=np.float32)
+        # return np.asarray([[0.5,0.0,0.0],[0.0,0.5,0.0],[0.0,0.0,1.0]],dtype=np.float32)
+        # m=np.identity(3)
+        # m[:2,:2]=get_rot_m(-np.pi/4)
+        # m[:2,:2]*=0.5
+        # return m
         return sample_homography_v2(self.args['h'],self.args['w'])
 
     def augment(self, img):

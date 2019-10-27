@@ -37,7 +37,7 @@ def test_time():
 def test_outputs():
     batch_index=0
     for data_i,data in enumerate(loader):
-        img_list0, pts_list0, grid_list0, img_list1, pts_list1, grid_list1, scale_offset, rotate_offset, H = data
+        img_list0,pts_list0,pix_pos0,grid_list0,img_list1,pts_list1,pix_pos1,grid_list1,scale_offset,rotate_offset,H = data
         for k in range(cfg['sample_scale_num']*cfg['sample_rotate_num']):
             if data_i<2:
                 if k==0: print('scale,rotate,H', scale_offset.shape, rotate_offset.shape, H.shape)
