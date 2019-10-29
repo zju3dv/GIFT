@@ -29,20 +29,6 @@ dataset=CorrespondenceDataset(cfg,database.coco_set*20)
 loader=DataLoader(dataset,batch_size,shuffle=True,num_workers=worker_num,worker_init_fn=worker_init_fn)
 wrapper=TrainWrapper(cfg).cuda()
 
-def to_cuda(data):
-    results=[]
-    for i,item in enumerate(data):
-        if type(item).__name__=="Tensor":
-            results.append(item.cuda())
-        elif type(item).__name__=='list':
-            tensor_list=[]
-            for tensor in item:
-                tensor_list.append(tensor.cuda())
-            results.append(tensor_list)
-        else:
-            raise NotImplementedError
-    return results
-
 def test_time():
     begin=time.time()
     for data_i, data in enumerate(loader):
