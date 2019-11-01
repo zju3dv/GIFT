@@ -134,8 +134,8 @@ class CorrespondenceDatabase:
             imsave(pth_out, img)
             return ratio
 
-        root_dir = os.path.join(cfg.data_dir, 'hpatches_sequence')
-        output_dir = os.path.join(cfg.data_dir, 'hpatches_{}'.format(name))
+        root_dir = os.path.join('data', 'hpatches_sequence')
+        output_dir = os.path.join('data', 'hpatches_{}'.format(name))
         pkl_file = os.path.join(output_dir, 'info.pkl')
         if os.path.exists(pkl_file):
             return read_pickle(pkl_file)
@@ -299,6 +299,16 @@ class CorrespondenceDatabase:
             self.coco_set = self.generate_homography_database(self.get_COCO_image_paths())
             print('coco_len {}'.format(len(self.coco_set)))
             return self.coco_set
+        if item== 'hi_set':
+            self.hi_set, self.hv_set = self.get_hpatch_sequence_database()
+            return self.hi_set
+        if item== 'hv_set':
+            self.hi_set, self.hv_set = self.get_hpatch_sequence_database()
+            return self.hv_set
+        if item == 'single_set':
+            self.single_set = self.generate_homography_database(self.get_COCO_image_paths()[:1]*10000)
+            print('single_len {}'.format(len(self.coco_set)))
+            return self.single_set
         else:
             super(CorrespondenceDatabase, self).__getattribute__(item)
 

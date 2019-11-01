@@ -78,7 +78,7 @@ class TransformerCV:
 
 
     @staticmethod
-    def postprocess_transformed_results(results,output_grid=False):
+    def postprocess_transformed_imgs(results, output_grid=False):
         img_list,pts_list,grid_list=[],[],[]
         for img_id, img in enumerate(results['img']):
             img_list.append(normalize_image(img))

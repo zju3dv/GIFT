@@ -6,12 +6,20 @@ from torch.nn import DataParallel
 from torch.utils.data import DataLoader
 import os
 import yaml
+import numpy as np
 
 from dataset.correspondence_dataset import CorrespondenceDataset
 from dataset.correspondence_database import CorrespondenceDatabase, worker_init_fn
+from dataset.transformer import TransformerCV
 from network.wrapper import TrainWrapper
-from train.train_tools import overwrite_configs, Recorder, to_cuda, adjust_learning_rate, reset_learning_rate
+from train.train_tools import overwrite_configs, Recorder, to_cuda, adjust_learning_rate, reset_learning_rate, \
+    dim_extend
 from torch.optim import Adam
+from skimage.io import imread
+
+from utils.base_utils import perspective_transform
+from utils.detector import detect_and_compute_sift_np
+from utils.match_utils import compute_match_pairs, keep_valid_kps_feats
 
 
 class Trainer:
@@ -59,29 +67,48 @@ class Trainer:
         self.extractor=self.network.extractor_wrapper
         self.embedder=self.network.embedder_wrapper
         self.network=DataParallel(self.network).cuda()
-        self.optim=Adam(self.network.parameters(),lr=1e-3)
-        self.step=0
 
+        paras=[]
+        if self.config['train_extractor']: paras+=self.extractor.parameters()
+        if self.config['train_embedder']: paras+=self.embedder.parameters()
+        self.optim=Adam(paras,lr=1e-3)
+
+        if self.config['pretrain']:
+            self._load_model(self.config['pretrain_model_path'],self.config['pretrain_step'],
+                             self.config['pretrain_extractor'],self.config['pretrain_embedder'],False)
+
+        self.step = 0
         self._load_model(self.model_dir, -1, True, True, True)
 
         self._network_ready=True
+        self.transformer = TransformerCV(self.config)
         print('network is ready')
 
-    def _get_hem_thresh(self):
-        if self.step<2000:
-            return 32
-        if 2000<=self.step<=10000:
-            return 32-31/8000*(self.step-2000)
-        if self.step>10000:
-            return 1
+    def _get_hem_thresh(self,):
+        hem_thresh_begin = self.config['hem_thresh_begin']
+        hem_thresh_end = self.config['hem_thresh_end']
+        warm_up_step = self.config['warm_up_step']
+        median_step = self.config['median_step']
+        if self.step<warm_up_step:
+            return hem_thresh_begin
+        if warm_up_step<=self.step<=median_step:
+            return hem_thresh_begin-(hem_thresh_begin-hem_thresh_end)/(median_step-warm_up_step)*(self.step - warm_up_step)
+        if self.step>median_step:
+            return hem_thresh_end
 
     def _get_lr(self):
-        if self.step<1000:
-            return 1e-4
-        if 1000<=self.step<=10000:
-            return 1e-3-(1e-3-5e-5)/8000*(self.step-2000)
-        if self.step>10000:
-            return 5e-5
+        lr_warm_up=self.config['lr_warm_up']
+        lr_begin=self.config['lr_begin']
+        lr_median=self.config['lr_median']
+        lr_end=self.config['lr_end']
+        warm_up_step = self.config['warm_up_step']
+        median_step = self.config['median_step']
+        if self.step<warm_up_step:
+            return lr_warm_up
+        if warm_up_step<=self.step<=median_step:
+            return lr_begin-(lr_begin-lr_median)/(median_step-warm_up_step)*(self.step-warm_up_step)
+        if self.step>median_step:
+            return lr_median-(lr_median-lr_end)/(self.config['train_step']-median_step)*(self.step-median_step)
 
     def train(self):
         self._init_network()
@@ -93,7 +120,8 @@ class Trainer:
             hem_thresh=self._get_hem_thresh()
 
             loss_info = OrderedDict()
-            img_list0,pts_list0,pts0,grid_list0,img_list1,pts_list1,pts1,grid_list1,scale_offset,rotate_offset,H=to_cuda(data)
+            # img_list0,pts_list0,pts0,grid_list0,img_list1,pts_list1,pts1,grid_list1,scale_offset,rotate_offset,H=to_cuda(data)
+            img_list0,pts_list0,pts0,grid_list0,img_list1,pts_list1,pts1,grid_list1,scale_offset,rotate_offset,H=data
             data_time = time.time() - batch_begin
 
             results = self.network(img_list0, pts_list0, pts0, grid_list0, img_list1, pts_list1, pts1, grid_list1,
@@ -105,6 +133,7 @@ class Trainer:
                 if k.endswith('loss'): loss = loss + v
                 loss_info[k] = v.cpu().detach().numpy()
 
+            self.network.zero_grad()
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
@@ -114,6 +143,7 @@ class Trainer:
             loss_info['data_time'] = data_time
             loss_info['batch_time'] = batch_time
             loss_info['lr'] = lr
+            loss_info['hem_thresh'] = hem_thresh
             total_step=self.step
             self.recorder.rec_loss(loss_info, total_step, total_step, 'train', ((total_step + 1) % self.config['info_step']) == 0)
 
@@ -124,10 +154,82 @@ class Trainer:
 
             batch_begin = time.time()
             self.step+=1
+            if self.step>self.config['train_step']: break
 
         self._save_model()
         print('model saved!')
 
+    def evaluate(self,dataset, dataset_name, use_raw_feats=False, kpts_type='superpoint',thresh=5):
+        evaluate_name=self.name if not use_raw_feats else kpts_type
+
+        corrects=[]
+        begin=time.time()
+        for data in dataset:
+            pth0, pth1, H = data['img0_pth'], data['img1_pth'], data['H'].copy()
+            print(pth0,pth1)
+            img0, img1 = imread(pth0), imread(pth1)
+            if kpts_type!='sift':
+                kps0, feats0 = self._get_feats_kps(pth0, self.model_name_to_dir_name[kpts_type])
+                kps1, feats1 = self._get_feats_kps(pth1, self.model_name_to_dir_name[kpts_type])
+            else:
+                kps0, feats0 = detect_and_compute_sift_np(img0)
+                kps1, feats1 = detect_and_compute_sift_np(img1)
+
+            if kps0.shape[0]==0 or kps1.shape[0]==0 or len(kps0)==0 or len(kps1)==0:
+                continue
+
+            kps0, feats0 = keep_valid_kps_feats(kps0, feats0, H, img1.shape[0], img1.shape[1])
+            kps1, feats1 = keep_valid_kps_feats(kps1, feats1, np.linalg.inv(H), img0.shape[0], img0.shape[1])
+            if kps0.shape[0]==0 or kps1.shape[0]==0 or len(kps0)==0 or len(kps1)==0:
+                continue
+
+            if not use_raw_feats:
+                feats0 = self._extract_feats(img0,kps0)
+                feats1 = self._extract_feats(img1,kps1)
+
+            pr01, gt01, pr10, gt10 = compute_match_pairs(feats0, kps0, feats1, kps1, H)
+            dist0 = np.linalg.norm(pr01 - gt01, 2, 1)
+            dist1 = np.linalg.norm(pr10 - gt10, 2, 1)
+            correct0 = dist0 < thresh
+            correct1 = dist1 < thresh
+            corrects.append((np.mean(correct0) + np.mean(correct1)) / 2)
+
+        print('{} {} pck {} cost {} s'.format(evaluate_name,dataset_name,np.mean(corrects),time.time()-begin))
+
+    model_name_to_dir_name = {
+        'superpoint': 'sp_hpatches',
+        'geodesc': 'gd_hpatches',
+        'geodesc_ds': 'gd_hpatches_ds',
+        'sift':'sift',
+        'lf_net':'lf_hpatches'
+    }
+
+    @staticmethod
+    def _get_feats_kps(pth, model_name):
+        if model_name=='sift':
+            kps, feats = detect_and_compute_sift_np(imread(pth))
+        else:
+            subpths = pth.split('/')
+            npzfn = '_'.join([subpths[-2], subpths[-1].split('.')[0]]) + '.npz'
+            data_dir = subpths[-3]
+            fn = os.path.join('data', model_name, data_dir)
+            fn = os.path.join(fn, npzfn)
+            if os.path.exists(fn):
+                npzfile = np.load(fn)
+                kps, feats = npzfile['kpts'], npzfile['descs']
+            else:
+                kps, feats= np.zeros([0,2]), np.zeros([0,128])
+                print('{} not found !'.format(fn))
+        return kps, feats
+
+    def _extract_feats(self, img, pts):
+        if not self._network_ready: self._init_network()
+        transformed_imgs=self.transformer.transform(img,pts)
+        with torch.no_grad():
+            img_list,pts_list=to_cuda(self.transformer.postprocess_transformed_imgs(transformed_imgs))
+            gfeats=self.extractor(dim_extend(img_list),dim_extend(pts_list))
+            efeats=self.embedder(gfeats)[0].detach().cpu().numpy()
+        return efeats
 
     def _save_model(self):
         os.system('mkdir -p {}'.format(self.model_dir))

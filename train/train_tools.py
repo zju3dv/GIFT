@@ -128,3 +128,10 @@ def to_cuda(data):
         else:
             raise NotImplementedError
     return results
+
+
+def dim_extend(data_list):
+    results = []
+    for i, tensor in enumerate(data_list):
+        results.append(tensor[None,...])
+    return results

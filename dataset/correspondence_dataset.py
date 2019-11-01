@@ -131,8 +131,8 @@ class CorrespondenceDataset(Dataset):
         # self.times[2] += time.time() - begin
 
         # begin=time.time()
-        img_list0,pts_list0,grid_list0=self.transformer.postprocess_transformed_results(results0,True)
-        img_list1,pts_list1,grid_list1=self.transformer.postprocess_transformed_results(results1,True)
+        img_list0,pts_list0,grid_list0=self.transformer.postprocess_transformed_imgs(results0, True)
+        img_list1,pts_list1,grid_list1=self.transformer.postprocess_transformed_imgs(results1, True)
 
         pix_pos0=torch.tensor(pix_pos0,dtype=torch.float32)
         pix_pos1=torch.tensor(pix_pos1,dtype=torch.float32)
