@@ -18,7 +18,7 @@ from torch.optim import Adam
 from skimage.io import imread
 
 from utils.base_utils import perspective_transform
-from utils.detector import detect_and_compute_sift_np
+from utils.detector import detect_and_compute_sift_np, detect_and_compute_harris_np
 from utils.match_utils import compute_match_pairs, keep_valid_kps_feats
 
 
@@ -162,11 +162,10 @@ class Trainer:
     def evaluate(self,dataset, dataset_name, use_raw_feats=False, kpts_type='superpoint',thresh=5):
         evaluate_name=self.name if not use_raw_feats else kpts_type
 
-        corrects=[]
+        corrects5, corrects2, corrects1 = [], [], []
         begin=time.time()
         for data in dataset:
             pth0, pth1, H = data['img0_pth'], data['img1_pth'], data['H'].copy()
-            print(pth0,pth1)
             img0, img1 = imread(pth0), imread(pth1)
             if kpts_type!='sift':
                 kps0, feats0 = self._get_feats_kps(pth0, self.model_name_to_dir_name[kpts_type])
@@ -190,24 +189,27 @@ class Trainer:
             pr01, gt01, pr10, gt10 = compute_match_pairs(feats0, kps0, feats1, kps1, H)
             dist0 = np.linalg.norm(pr01 - gt01, 2, 1)
             dist1 = np.linalg.norm(pr10 - gt10, 2, 1)
-            correct0 = dist0 < thresh
-            correct1 = dist1 < thresh
-            corrects.append((np.mean(correct0) + np.mean(correct1)) / 2)
+            corrects5.append((np.mean(dist0 < 5) + np.mean(dist1 < 5)) / 2)
+            corrects2.append((np.mean(dist0 < 2) + np.mean(dist1 < 2)) / 2)
+            corrects1.append((np.mean(dist0 < 1) + np.mean(dist1 < 1)) / 2)
 
-        print('{} {} pck {} cost {} s'.format(evaluate_name,dataset_name,np.mean(corrects),time.time()-begin))
+        print('{} {} pck-5 {} -2 {} -1 {} cost {} s'.format(evaluate_name,dataset_name,np.mean(corrects5),np.mean(corrects2),np.mean(corrects1),time.time()-begin))
 
     model_name_to_dir_name = {
         'superpoint': 'sp_hpatches',
         'geodesc': 'gd_hpatches',
         'geodesc_ds': 'gd_hpatches_ds',
         'sift':'sift',
-        'lf_net':'lf_hpatches'
+        'lf_net':'lf_hpatches',
+        'harris':'harris'
     }
 
     @staticmethod
     def _get_feats_kps(pth, model_name):
         if model_name=='sift':
             kps, feats = detect_and_compute_sift_np(imread(pth))
+        elif model_name=='harris':
+            kps, feats = detect_and_compute_harris_np(imread(pth),2048)
         else:
             subpths = pth.split('/')
             npzfn = '_'.join([subpths[-2], subpths[-1].split('.')[0]]) + '.npz'
