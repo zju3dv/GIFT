@@ -61,3 +61,16 @@ def normalize_coordinates(coords, h, w):
     coords[:, :, 0]/= w / 2
     coords[:, :, 1]/= h / 2
     return coords
+
+
+class RotationalConv(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, feats):
+        '''
+
+        :param feats:
+        :return:
+        '''
+        nn.Conv2d

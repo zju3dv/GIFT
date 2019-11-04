@@ -1,4 +1,7 @@
 import sys
+
+import torch
+
 sys.path.append('.')
 
 import cv2
@@ -8,6 +11,7 @@ from torch.utils.data import DataLoader
 from skimage.io import imsave
 from dataset.correspondence_dataset import  CorrespondenceDataset
 from dataset.correspondence_database import CorrespondenceDatabase, worker_init_fn
+from train.train_tools import overwrite_configs, to_cuda
 import time
 import yaml
 
@@ -18,9 +22,11 @@ parser.add_argument('--cfg', type=str, default='configs/default.yaml')
 parser.add_argument('--max_num', type=int, default=5)
 flags=parser.parse_args()
 
+with open('configs/default.yaml','r') as f:
+    default_cfg=yaml.load(f, Loader=yaml.FullLoader)
 with open(flags.cfg,'r') as f:
     cfg=yaml.load(f, Loader=yaml.FullLoader)
-
+cfg=overwrite_configs(default_cfg,cfg)
 batch_size=cfg['batch_size']
 worker_num=cfg['worker_num']
 
@@ -31,6 +37,8 @@ loader=DataLoader(dataset,batch_size,shuffle=True,num_workers=worker_num,worker_
 def test_time():
     begin=time.time()
     for data_i,data in enumerate(loader):
+        to_cuda(data)
+        torch.cuda.synchronize()
         if data_i>flags.max_num: break
     print('batch size {} worker num {} cost {} s'.format(batch_size,worker_num,(time.time()-begin)/(data_i+1)))
 

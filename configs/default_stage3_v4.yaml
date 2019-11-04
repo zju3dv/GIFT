@@ -1,4 +1,4 @@
-name: default_stage3
+name: default_stage3_v4
 
 extractor: "NetworkShallowPool2"
 embedder: "GREBilinearPoolPaddingDeepMore"
@@ -27,9 +27,9 @@ hem_interval: 8
 hem_thresh_begin: 16
 hem_thresh_end: 4
 
-lr_warm_up: 0.0001 # 1e-4
-lr_begin: 0.0001   # 1e-4
-lr_median: 0.00005 # 5e-5
+lr_warm_up: 0.0005 # 5e-4
+lr_begin: 0.0005   # 5e-4
+lr_median: 0.0001  # 1e-4
 lr_end: 0.00001    # 1e-5
 
 augmentation_args:
@@ -37,13 +37,13 @@ augmentation_args:
     w: 640
 
     test_harris: true
-    harris_percentile: 99
-    sample_num: 128
+    harris_percentile: 90
+    sample_num: 512
 
     augment: true
-    augment_classes: ["jitter","sp_gaussian_noise","sp_additive_shade","sp_motion_blur","none"]
-    augment_classes_weight: [0.2,0.2,0.2,0.2,0.2]
-    augment_num: 4
+    augment_classes: ["jitter","sp_gaussian_noise","sp_speckle_noise","sp_additive_shade","sp_motion_blur","none"]
+    augment_classes_weight: [0.17,0.17,0.16,0.17,0.16,0.17]
+    augment_num: 5
     add_background: true
 
     brightness: 0.2

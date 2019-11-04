@@ -1,46 +1,34 @@
-name: default_tmp
-
-sample_scale_begin: 0
-sample_scale_inter: 0.5 # 0.70716
-sample_scale_num: 5 # 6
-sample_rotate_begin: -90
-sample_rotate_inter: 45 # 30
-sample_rotate_num: 5   # 7
-
-train_set: ["coco"]
+name: default_stage3_v2
 
 extractor: "NetworkShallowPool2"
 embedder: "GREBilinearPoolPaddingDeepMore"
 
-pretrain: false
-pretrain_model_path: ""
+pretrain: true
+pretrain_model_path: "data/model/default_stage2"
 pretrain_step: -1
-pretrain_extractor: false
-pretrain_embedder: false
+pretrain_extractor: true
+pretrain_embedder: true
 
-train_embedder: false
+loss_type: "gefeats"
 train_extractor: true
+train_embedder: true
 
-
-loss_type: "gfeats"
-loss_margin: 0.5
-
-batch_size: 4
+batch_size: 2
 worker_num: 8
 
-train_step: 20000
-warm_up_step: 1000
-median_step: 10000
+train_step: 10000
+warm_up_step: 0
+median_step: 5000
 
 save_step: 500
 info_step: 50
 
-hem_interval: 16
-hem_thresh_begin: 64
-hem_thresh_end: 16
+hem_interval: 8
+hem_thresh_begin: 16
+hem_thresh_end: 8
 
 lr_warm_up: 0.0001 # 1e-4
-lr_begin: 0.001    # 1e-3
+lr_begin: 0.0001   # 1e-4
 lr_median: 0.00005 # 5e-5
 lr_end: 0.00001    # 1e-5
 
@@ -49,8 +37,8 @@ augmentation_args:
     w: 640
 
     test_harris: true
-    harris_percentile: 95
-    sample_num: 512
+    harris_percentile: 99
+    sample_num: 128
 
     augment: true
     augment_classes: ["jitter","sp_gaussian_noise","sp_additive_shade","sp_motion_blur","none"]
