@@ -73,7 +73,7 @@ data/
 # use keypoints detected by superpoint and descriptors computed by GIFT
 python run.py --task=eval_original \
               --det_cfg=configs/eval/superpoint_det.yaml \
-              --desc_cfg=gift_pretrain_desc.yaml \
+              --desc_cfg=configs/eval/gift_pretrain_desc.yaml \
               --match_cfg=configs/eval/match_v2.yaml
 
 # use keypoints detected by superpoint and descriptors computed by superpoint
@@ -104,7 +104,7 @@ data
 # use keypoints detected by superpoint and descriptors computed by GIFT
 python run.py --task=rel_pose \
               --det_cfg=configs/eval/superpoint_det.yaml \
-              --desc_cfg=gift_pretrain_desc.yaml \
+              --desc_cfg=configs/eval/gift_pretrain_desc.yaml \
               --match_cfg=configs/eval/match_v0.yaml
 
 # use keypoints detected by superpoint and descriptors computed by superpoint
@@ -130,8 +130,8 @@ data
 ├── SUN2012Images/
 |   └── JPEGImages/
 └── coco/
-    ├── train/ 
-    └── val/
+    ├── train2014/ 
+    └── val2014/
 ```
 
 3. Training
