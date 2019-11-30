@@ -1,6 +1,8 @@
 import os
 
-cuda_include='/usr/local/cuda-8.0/include'
+cuda_version='8.0' # installed cuda version
+cuda_include=f'/usr/local/cuda-{cuda_version}/include'
+cuda_library=f'/usr/local/cuda-{cuda_version}/lib64'
 
 os.system('nvcc src/nearest_neighborhood.cu -c -o src/nearest_neighborhood.cu.o -x cu -Xcompiler -fPIC -O2 -arch=sm_52 -I {} -D_FORCE_INLINES'.
           format(cuda_include))
@@ -20,7 +22,7 @@ ffibuilder.set_source("_extend_utils",
                       """,
                       extra_objects=['src/nearest_neighborhood.cu.o'],
                       libraries=['stdc++','cudart'],
-                      extra_link_args=["-L/usr/local/cuda-8.0/lib64"],
+                      extra_link_args=[f"-L{cuda_library}"],
                       # extra_compile_args=[],
                       )
 

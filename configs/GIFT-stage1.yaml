@@ -1,0 +1,79 @@
+name: GIFT-stage1
+
+sample_scale_begin: 0
+sample_scale_inter: 0.5 # 0.70716
+sample_scale_num: 5 # 6
+sample_rotate_begin: -90
+sample_rotate_inter: 45 # 30
+sample_rotate_num: 5   # 7
+
+train_set: ["coco"]
+
+extractor: "VanillaLightCNN"
+embedder: "BilinearGCNN"
+
+pretrain: false
+pretrain_model_path: ""
+pretrain_step: -1
+pretrain_extractor: false
+pretrain_embedder: false
+
+train_embedder: false
+train_extractor: true
+
+loss_type: "gfeats"
+loss_margin: 0.5
+loss_square: true
+
+lr_type: "warm_up"
+
+batch_size: 4
+worker_num: 8
+
+train_step: 20000
+save_step: 500
+info_step: 50
+
+hem_interval: 16
+hem_thresh_begin: 32
+hem_thresh_decay_rate: 1
+hem_thresh_decay_step: 250
+hem_thresh_end: 16
+
+augmentation_args:
+    h: 480
+    w: 640
+
+    test_harris: true
+    harris_percentile: 90
+    sample_num: 512
+
+    test_edge: true
+    edge_thresh: 8
+
+    add_background: true
+
+    augment: true
+    augment_classes: ["jitter","sp_gaussian_noise","sp_speckle_noise","sp_additive_shade","sp_motion_blur","none"]
+    augment_classes_weight: [0.17,0.17,0.16,0.17,0.16,0.17]
+    augment_num: 5
+
+    brightness: 0.2
+    contrast: 0.5
+    saturation: 0.1
+    hue: 0.0
+
+    jpeg_low: 15
+    jpeg_high: 75
+    blur_range: [3,5]
+
+    perturb: true
+    perturb_max: 3
+
+    sp_gaussian_range: [0,10]
+    sp_speckle_prob_range: [0.0,0.0035]
+    sp_nb_ellipse: 20
+    sp_transparency_range: [-0.5,0.5]
+    sp_kernel_size_range: [100,150]
+    sp_max_kernel_size: 3
+    resize_blur_min_ratio: 0.5

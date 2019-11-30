@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from utils.base_utils import get_rot_m, normalize_image
+from utils.base_utils import get_rot_m, normalize_image, tensor_to_image, get_img_patch
 import cv2
 
 class TransformerCV:
@@ -19,6 +19,9 @@ class TransformerCV:
 
         self.grid_interval=cfg['hem_interval']
         self.ssi=ssi
+
+        self.ssn=ssn
+        self.srn=srn
 
         self.SRs=[]
         for scale in self.scales:
@@ -39,8 +42,9 @@ class TransformerCV:
         pts0=np.asarray([[0,0],[0,h],[w,h],[w,0]],np.float32)
         center = np.mean(pts0, 0)
 
+        begins = np.random.randint(0, self.grid_interval, 2)
         if output_grid:
-            xs, ys=np.meshgrid(np.arange(0,w,self.grid_interval),np.arange(0,h,self.grid_interval))
+            xs, ys=np.meshgrid(np.arange(begins[0],w,self.grid_interval),np.arange(begins[1],h,self.grid_interval))
             gh,gw=xs.shape[0],xs.shape[1]
             grid=np.concatenate([xs[:,:,None],ys[:,:,None]],2).reshape([gh*gw, 2]) # hem_h*hem_w,2
 
@@ -72,10 +76,37 @@ class TransformerCV:
 
         outputs={'img':img_warps}
         if pts is not None: outputs['pts']=pts_warps
-        if output_grid: outputs['grid']=grid_warps
+        if output_grid:
+            outputs['grid']=grid_warps
+            outputs['grid_begins']=begins
 
         return outputs
 
+    def get_regions(self, img_list, pts_list, pi, batch_index=None, size=20):
+        '''
+
+        :param img_list:  produced by postprocess_transformed_imgs
+        :param pts_list: produced by postprocess_transformed_imgs
+        :param pi:
+        :param batch_index:  if given, then the input is batched, if not given, the input is not batched
+        :return:
+        '''
+        imgs = []
+        for si in range(self.ssn):
+            scale_imgs = []
+            for ri in range(self.srn):
+                k = si * self.srn + ri
+                if batch_index is not None:
+                    img0 = tensor_to_image(img_list[k][batch_index].numpy())
+                    pt0 = pts_list[k][batch_index, pi].numpy()
+                else:
+                    img0 = tensor_to_image(img_list[k].numpy())
+                    pt0 = pts_list[k][pi].numpy()
+
+                pat0 = get_img_patch(img0, pt0, size)
+                scale_imgs.append(pat0)
+            imgs.append(np.concatenate(scale_imgs, 1))
+        return np.concatenate(imgs, 0)
 
     @staticmethod
     def postprocess_transformed_imgs(results, output_grid=False):

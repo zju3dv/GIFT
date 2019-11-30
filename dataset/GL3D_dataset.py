@@ -96,33 +96,3 @@ def get_gl3d_dataset(root='data/GL3D'):
 
 if __name__=="__main__":
     pass
-    # from skimage.io import imread
-    # import matplotlib.pyplot as plt
-    #
-    # pid='000000000000000000000001'
-    # matches=read_corr('data/GL3D/{}/geolabel/corr.bin'.format(pid))
-    # image_list=read_image_list('data/GL3D/{}/image_list.txt'.format(pid))
-    # for match_index, match in enumerate(matches):
-    #     if match_index >= 5: break
-    #     img_id0=match[0]
-    #     img_id1=match[1]
-    #     img_pth0=image_list[img_id0].split('/')[-1]
-    #     img_pth1=image_list[img_id1].split('/')[-1]
-    #     img0=imread('data/GL3D/{}/images_desc_train/{}'.format(pid,img_pth0))
-    #     img1=imread('data/GL3D/{}/images_desc_train/{}'.format(pid,img_pth1))
-    #
-    #     for corr_index, corr in enumerate(match[2]):
-    #         if corr_index >= 5: break
-    #         pt0=(corr[:6].reshape([2,3])[:,2]+1.0)/2.0
-    #         pt1=(corr[6:12].reshape([2,3])[:,2]+1.0)/2.0
-    #
-    #         h0,w0,_=img0.shape
-    #         h1,w1,_=img1.shape
-    #         plt.subplot(221)
-    #         plt.imshow(img0)
-    #         plt.plot([w0*pt0[0]],[h0*pt0[1]],'r*')
-    #         plt.subplot(222)
-    #         plt.imshow(img1)
-    #         plt.plot([w1*pt1[0]],[h1*pt1[1]],'r*')
-    #         plt.savefig('result/GL3D/{}_{}_{}.png'.format(pid,match_index,corr_index))
-    #         plt.close()

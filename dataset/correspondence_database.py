@@ -5,8 +5,8 @@ import os
 import cv2
 from skimage.io import imread, imsave
 
+from dataset.GL3D_dataset import get_gl3d_dataset
 from utils.base_utils import perspective_transform, read_pickle, save_pickle
-from utils.config import cfg
 
 
 def worker_init_fn(worker_id):
@@ -102,15 +102,15 @@ def rotate_transform_img(img, min_angle=0, max_angle=360, random_flip=False):
 class CorrespondenceDatabase:
     @staticmethod
     def get_SUN2012_image_paths():
-        img_dir = os.path.join(cfg.data_dir, 'SUN2012Images', 'JPEGImages')
+        img_dir = os.path.join('data', 'SUN2012Images', 'JPEGImages')
         img_pths = [os.path.join(img_dir, fn) for fn in os.listdir(img_dir)]
         return img_pths
 
     @staticmethod
     def get_COCO_image_paths():
-        img_dir = os.path.join(cfg.data_dir, 'coco', 'train2014')
+        img_dir = os.path.join('data', 'coco', 'train2014')
         img_pths = [os.path.join(img_dir, fn) for fn in os.listdir(img_dir)]
-        img_dir = os.path.join(cfg.data_dir, 'coco', 'val2014')
+        img_dir = os.path.join('data', 'coco', 'val2014')
         img_pths += [os.path.join(img_dir, fn) for fn in os.listdir(img_dir)]
         return img_pths
 
@@ -171,7 +171,7 @@ class CorrespondenceDatabase:
 
     @staticmethod
     def add_homography_background(img, H):
-        img_dir = os.path.join(cfg.data_dir, 'SUN2012Images', 'JPEGImages')
+        img_dir = os.path.join('data', 'SUN2012Images', 'JPEGImages')
         background_pths = [os.path.join(img_dir, fn) for fn in os.listdir(img_dir)]
         bpth = background_pths[np.random.randint(0, len(background_pths))]
 
@@ -184,8 +184,8 @@ class CorrespondenceDatabase:
         return img
 
     @staticmethod
-    def make_hpatch_transform_database_combine(in_dataset, output_name, transform, add_background):
-        hpatch_transform_root_dir = os.path.join(cfg.data_dir, 'hpatches_{}'.format(output_name))
+    def make_hpatch_transform_database_combine(in_dataset, output_name, transform, add_background, identity=False):
+        hpatch_transform_root_dir = os.path.join('data', 'hpatches_{}'.format(output_name))
         if not os.path.exists(hpatch_transform_root_dir): os.mkdir(hpatch_transform_root_dir)
 
         hpatch_transform_pkl = os.path.join(hpatch_transform_root_dir, 'info.pkl')
@@ -209,10 +209,16 @@ class CorrespondenceDatabase:
             if add_background: img1 = CorrespondenceDatabase.add_homography_background(img1, H)
             img1_pth = os.path.join(output_dir, '{}.png'.format(in_id))
             imsave(img1_pth, img1)
-            data = {'type': 'hpatch',
-                    'img0_pth': pth0,
-                    'img1_pth': img1_pth,
-                    'H': H @ in_data['H']}
+            if identity:
+                data = {'type': 'hpatch',
+                        'img0_pth': pth1,
+                        'img1_pth': img1_pth,
+                        'H': H}
+            else:
+                data = {'type': 'hpatch',
+                        'img0_pth': pth0,
+                        'img1_pth': img1_pth,
+                        'H': H @ in_data['H']}
             dataset.append(data)
 
         save_pickle(dataset, hpatch_transform_pkl)
@@ -299,16 +305,31 @@ class CorrespondenceDatabase:
             self.coco_set = self.generate_homography_database(self.get_COCO_image_paths())
             print('coco_len {}'.format(len(self.coco_set)))
             return self.coco_set
-        if item== 'hi_set':
+        elif item== 'hi_set' or item=='hv_set':
             self.hi_set, self.hv_set = self.get_hpatch_sequence_database()
-            return self.hi_set
-        if item== 'hv_set':
-            self.hi_set, self.hv_set = self.get_hpatch_sequence_database()
-            return self.hv_set
-        if item == 'single_set':
-            self.single_set = self.generate_homography_database(self.get_COCO_image_paths()[:1]*10000)
-            print('single_len {}'.format(len(self.coco_set)))
-            return self.single_set
+            if item=='hi_set': return self.hi_set
+            else: return self.hv_set
+        elif item.startswith('erotate') or item.startswith('escale'):
+            scaling = lambda img: scale_transform_img(img, 1.5, 2.0)
+            rotating = lambda img: rotate_transform_img(img, -90, 90, True)
+            escale_set = self.make_hpatch_transform_database_combine(
+                self.hv_set, 'escale', scaling, True)
+            escale_illm_set = self.make_hpatch_transform_database_combine(
+                self.hi_set, 'escale_illm', scaling, True)
+            self.escale_set=escale_set+escale_illm_set
+            erotate_set = self.make_hpatch_transform_database_combine(
+                self.hv_set, 'erotate', rotating, True)
+            erotate_illm_set = self.make_hpatch_transform_database_combine(
+                self.hi_set, 'erotate_illm', rotating, True)
+            self.erotate_set=erotate_set+erotate_illm_set
+            if item=='erotate_set':
+                return self.erotate_set
+            else:
+                return self.escale_set
+        elif item=='gl3d_set':
+            self.gl3d_set=get_gl3d_dataset()
+            print('gl3d len {}'.format(len(self.gl3d_set)))
+            return self.gl3d_set
         else:
             super(CorrespondenceDatabase, self).__getattribute__(item)
 

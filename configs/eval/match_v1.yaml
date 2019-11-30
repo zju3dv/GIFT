@@ -1,0 +1,4 @@
+mutual_best: true
+ratio_test: true
+ratio: 0.8
+cuda: true

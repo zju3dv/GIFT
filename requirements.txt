@@ -1,3 +1,4 @@
+matplotlib
 opencv-python
 scikit-image
 numpy
@@ -6,3 +7,5 @@ torch
 PyYAML
 transforms3d
 easydict
+cffi
+

@@ -1,7 +1,6 @@
 import torch
 
-from hard_mining.hard_example_mining_layer import semi_hard_example_mining_layer
-
+from hard_mining.hard_example_mining_layer import semi_hard_example_mining_layer, sq_semi_hard_example_mining_layer
 
 def scale_rotate_offset_dist(feats0,feats1,scale_offset,rotate_offset,max_sn,max_rn):
     '''
@@ -53,7 +52,7 @@ def scale_rotate_offset_dist(feats0,feats1,scale_offset,rotate_offset,max_sn,max
 
     return dist
 
-def sample_semi_hard_feature(feats, dis_pos, feats_pos, pix_pos, interval, thresh, margin):
+def sample_semi_hard_feature(feats, dis_pos, feats_pos, pix_pos, interval, thresh, margin, loss_square=False):
     '''
     :param feats:      b,f,h,w
     :param dis_pos:    b,n
@@ -62,10 +61,14 @@ def sample_semi_hard_feature(feats, dis_pos, feats_pos, pix_pos, interval, thres
     :param interval:
     :param thresh:
     :param margin:
+    :param loss_square:
     :return:
     '''
     with torch.no_grad():
-        pix_neg=semi_hard_example_mining_layer(feats, dis_pos, feats_pos, pix_pos, interval, thresh, margin).long() # b,n,3
+        if loss_square:
+            pix_neg = sq_semi_hard_example_mining_layer(feats, dis_pos, feats_pos, pix_pos, interval, thresh, margin).long()  # b,n,3
+        else:
+            pix_neg=semi_hard_example_mining_layer(feats, dis_pos, feats_pos, pix_pos, interval, thresh, margin).long() # b,n,3
     feats=feats.permute(0,2,3,1)
     feats_neg=feats[pix_neg[:,:,0],pix_neg[:,:,2],pix_neg[:,:,1]]   # b,n,f
     return feats_neg

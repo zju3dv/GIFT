@@ -1,3 +1,6 @@
+import cv2
+
+from dataset.transformer import TransformerCV
 from network.embedder import *
 from network.extractor import *
 
@@ -8,14 +11,18 @@ import numpy as np
 from network.loss import scale_rotate_offset_dist, sample_semi_hard_feature, clamp_loss_all
 from network.operator import normalize_coordinates
 
+import os
+
+from train.train_tools import to_cuda, dim_extend
+
 name2embedder={
-    "GREBilinearPool":GREBilinearPool,
-    "GREBilinearPoolPaddingDeepMore":GREBilinearPoolPaddingDeepMore,
+    "BilinearGCNN":BilinearGCNN,
+    "BilinearRotationGCNN":BilinearRotationGCNN,
+    "GRENone":GRENone,
     "None": lambda cfg: None,
 }
 name2extractor={
-    "NetworkShallow": NetworkShallow,
-    "NetworkShallowPool2": NetworkShallowPool2,
+    "VanillaLightCNN": VanillaLightCNN,
     "None": lambda cfg: None,
 }
 
@@ -88,40 +95,12 @@ class TrainWrapper(nn.Module):
         super().__init__()
         self.extractor_wrapper=ExtractorWrapper(cfg)
         self.embedder_wrapper=EmbedderWrapper(cfg)
+        self.config=cfg
         self.sn, self.rn = cfg['sample_scale_num'], cfg['sample_rotate_num']
         self.loss_margin = cfg['loss_margin']
         self.hem_interval = cfg['hem_interval']
         self.train_embedder = cfg['train_embedder']
         self.train_extractor = cfg['train_extractor']
-
-    # def validate_scale_rotate_offset_dist(self, img_list0, pts_list0, pts0, grid_list0, img_list1, pts_list1, pts1,
-    #                                       grid_list1, scale_offset, rotate_offset, hem_thresh, loss_type='gfeats'):
-    #     gfeats0 = self.extractor_wrapper(img_list0,pts_list0)  # [b,n,fg,sn,rn]
-    #     gfeats1, gfeats_neg = self.extractor_wrapper(img_list1,pts_list1,grid_list1) # [b,n,fg,sn,rn] [b,hn,wn,fg,sn,rn]
-    #     b, n, fg, sn, rn = gfeats0.shape
-    #     assert(sn==self.sn and rn==self.rn)
-    #
-    #     # pos distance [b,n]
-    #     dis_pos = scale_rotate_offset_dist(gfeats0.permute(0, 1, 3, 4, 2), gfeats1.permute(0, 1, 3, 4, 2), scale_offset, rotate_offset, self.sn, self.rn)
-    #
-    #     sp=scale_offset+1; sp[sp>self.sn-1]=self.sn-1
-    #     sn=scale_offset-1; sn[sn<-self.sn+1]=-self.sn+1
-    #     dis_pos_sp1 = scale_rotate_offset_dist(gfeats0.permute(0, 1, 3, 4, 2), gfeats1.permute(0, 1, 3, 4, 2), sp, rotate_offset, self.sn, self.rn)
-    #     dis_pos_sn1 = scale_rotate_offset_dist(gfeats0.permute(0, 1, 3, 4, 2), gfeats1.permute(0, 1, 3, 4, 2), sn, rotate_offset, self.sn, self.rn)
-    #
-    #     rp=rotate_offset+1; rp[rp>self.rn-1]=self.rn-1
-    #     rn=rotate_offset-1; rn[rn<-self.rn+1]=-self.rn+1
-    #     dis_pos_rp1 = scale_rotate_offset_dist(gfeats0.permute(0, 1, 3, 4, 2), gfeats1.permute(0, 1, 3, 4, 2), scale_offset, rp, self.sn, self.rn)
-    #     dis_pos_rn1 = scale_rotate_offset_dist(gfeats0.permute(0, 1, 3, 4, 2), gfeats1.permute(0, 1, 3, 4, 2), scale_offset, rn, self.sn, self.rn)
-    #
-    #     mask_sp1=(dis_pos-dis_pos_sp1)>0
-    #     mask_sn1=(dis_pos-dis_pos_sn1)>0
-    #     mask_rp1=(dis_pos-dis_pos_rp1)>0
-    #     mask_rn1=(dis_pos-dis_pos_rn1)>0
-    #
-    #     print(scale_offset[:,:10])
-    #     print(rotate_offset[:,:10])
-    #     print(torch.sum(mask_sp1),torch.sum(mask_sn1),torch.sum(mask_rp1),torch.sum(mask_rn1),mask_rn1.shape)
 
     def forward(self, img_list0, pts_list0, pts0, grid_list0, img_list1, pts_list1, pts1, grid_list1, scale_offset, rotate_offset, hem_thresh, loss_type='gfeats'):
         '''
@@ -165,12 +144,18 @@ class TrainWrapper(nn.Module):
 
             gfeats0=gfeats0.permute(0, 3, 4, 1, 2)
             gfeats0=gfeats0.reshape(b * sn * rn, n, fg)
-            gfeats_shem_neg=sample_semi_hard_feature(gfeats_neg, dis_pos, gfeats0, pts_shem_gt, 1, hem_thresh, self.loss_margin) # b*sn*rn,n,fg
-            # neg distance [b,n]
-            dis_neg = torch.norm(gfeats0-gfeats_shem_neg, 2, 2) # b*sn*rn,n
+            if self.config['loss_square']:
+                dis_pos = dis_pos * dis_pos
+                gfeats_shem_neg = sample_semi_hard_feature(gfeats_neg, dis_pos, gfeats0, pts_shem_gt, 1, hem_thresh, self.loss_margin, True)
+                dis_neg = torch.norm(gfeats0-gfeats_shem_neg, 2, 2) # b*sn*rn,n
+                dis_neg = dis_neg * dis_neg
+            else:
+                gfeats_shem_neg = sample_semi_hard_feature(gfeats_neg, dis_pos, gfeats0, pts_shem_gt, 1, hem_thresh, self.loss_margin) # b*sn*rn,n,fg
+                # neg distance [b,n]
+                dis_neg = torch.norm(gfeats0-gfeats_shem_neg, 2, 2) # b*sn*rn,n
         else:
             assert(loss_type=='gefeats')
-            if self.train_embedder:
+            if self.train_embedder or self.config['embedder']=='GRENone':
                 efeats0=self.embedder_wrapper(gfeats0)     # b,n,fe
                 efeats1=self.embedder_wrapper(gfeats1)     # b,n,fe
                 efeats_neg=self.embedder_wrapper(gfeats_neg.reshape(b,hn*wn,fg,sn,rn)) # b,hn*wn,fe
@@ -186,10 +171,14 @@ class TrainWrapper(nn.Module):
             # neg search
             fe=efeats_neg.shape[-1]
             efeats_neg=efeats_neg.reshape(b,hn,wn,fe).permute(0,3,1,2)
-            efeats_shem_neg=sample_semi_hard_feature(efeats_neg,dis_pos,efeats0,pts_shem_gt,1,hem_thresh,self.loss_margin)
-
-            # neg distance [b,n]
-            dis_neg = torch.norm(efeats0-efeats_shem_neg, 2, 2)
+            if self.config['loss_square']:
+                dis_pos = dis_pos * dis_pos
+                efeats_shem_neg = sample_semi_hard_feature(efeats_neg, dis_pos, efeats0, pts_shem_gt, 1, hem_thresh, self.loss_margin, True)
+                dis_neg = torch.norm(efeats0-efeats_shem_neg, 2, 2)
+                dis_neg = dis_neg * dis_neg
+            else:
+                efeats_shem_neg = sample_semi_hard_feature(efeats_neg, dis_pos, efeats0, pts_shem_gt, 1, hem_thresh, self.loss_margin)
+                dis_neg = torch.norm(efeats0-efeats_shem_neg, 2, 2)
 
         triplet_loss, triplet_neg_rate = clamp_loss_all(dis_pos - dis_neg + self.loss_margin)
 
@@ -201,3 +190,33 @@ class TrainWrapper(nn.Module):
         }
         return results
 
+class GIFTDescriptor:
+    def __init__(self,cfg):
+        self.extractor=ExtractorWrapper(cfg).cuda()
+        self.embedder=EmbedderWrapper(cfg).cuda()
+        self._load_model(cfg['model_dir'],cfg['step'])
+        self.transformer = TransformerCV(cfg)
+
+    def __call__(self, img, pts):
+        h,w=img.shape[:2]
+        transformed_imgs=self.transformer.transform(img,pts)
+        with torch.no_grad():
+            img_list,pts_list=to_cuda(self.transformer.postprocess_transformed_imgs(transformed_imgs))
+            gfeats=self.extractor(dim_extend(img_list),dim_extend(pts_list))
+            efeats=self.embedder(gfeats)[0].detach().cpu().numpy()
+        return efeats
+
+    def _load_model(self, model_dir, step=-1):
+        pths = [int(pth.split('.')[0]) for pth in os.listdir(model_dir)]
+        if len(pths) == 0:
+            return 0
+        if step == -1:
+            pth = max(pths)
+        else:
+            pth = step
+
+        pretrained_model = torch.load(os.path.join(model_dir, '{}.pth'.format(pth)))
+        self.extractor.load_state_dict(pretrained_model['extractor'])
+        self.embedder.load_state_dict(pretrained_model['embedder'])
+        print('load {} step {}'.format(model_dir, pretrained_model['step']))
+        self.step = pretrained_model['step'] + 1

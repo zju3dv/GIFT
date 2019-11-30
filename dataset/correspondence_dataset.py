@@ -1,16 +1,16 @@
 import os
 
 import torch
-import numpy as np
+from scipy import stats
 
 from skimage.io import imread
 from torch.utils.data import Dataset
 from torchvision.transforms import ColorJitter
 
-from dataset.homography import compute_similar_affine_batch, sample_homography_v2
+from dataset.homography import compute_approximated_affine_batch, sample_homography
 from dataset.photometric_augmentation import *
 from dataset.transformer import TransformerCV
-from utils.augmentation_utils import add_noise, gaussian_blur, jpeg_compress, random_rotate_img
+from utils.augmentation_utils import add_noise, gaussian_blur, jpeg_compress
 from utils.base_utils import gray_repeats, get_rot_m
 
 
@@ -19,8 +19,6 @@ class CorrespondenceDataset(Dataset):
         super(CorrespondenceDataset,self).__init__()
         self.base_scale=train_cfg['sample_scale_inter']
         self.base_rotate=train_cfg['sample_rotate_inter']/180*np.pi
-        # while len(database) < min_length:
-        #     database += database
         self.database=database
         self.transformer=TransformerCV(train_cfg)
 
@@ -43,8 +41,6 @@ class CorrespondenceDataset(Dataset):
             'sp_motion_blur': lambda img_in: motion_blur(img_in,self.args['sp_max_kernel_size']),
             'resize_blur': lambda img_in: resize_blur(img_in, self.args['resize_blur_min_ratio'])
         }
-        #### for test ###
-        # self.times=[0,0,0,0,0,0]
 
     def __len__(self):
         return len(self.database)
@@ -57,7 +53,6 @@ class CorrespondenceDataset(Dataset):
         th, tw = self.args['h'],self.args['w']
         img_raw = gray_repeats(img_raw)
 
-        # begin=time.time()
         if np.random.random()<0.8:
             img_raw,_,_=self.get_image_region(img_raw,th*np.random.uniform(0.8,1.2),tw*np.random.uniform(0.8,1.2))
 
@@ -73,13 +68,9 @@ class CorrespondenceDataset(Dataset):
         else:
             # black is 127 here because it should be consistent with image_normalization
             img1=self.add_black_background(img1,H)
-        # self.times[4]+=time.time()-begin
 
-        # begin=time.time()
-        # get ground truth
         pix_pos0, pix_pos1 = self.sample_ground_truth(img0,H)
         scale_offset, rotate_offset = self.compute_scale_rotate_offset(H,pix_pos0)
-        # self.times[5]+=time.time()-begin
         return img0, img1, pix_pos0, pix_pos1, H, scale_offset, rotate_offset
 
     def decode_gl3d(self, data):
@@ -107,40 +98,29 @@ class CorrespondenceDataset(Dataset):
         return img0, img1, pix_pos0, pix_pos1, H, scale_offset, rotate_offset
 
     def decode(self, data):
-        # begin=time.time()
         if data['type']=='homography':
             img0, img1, pix_pos0, pix_pos1, H, scale_offset, rotate_offset = self.decode_homography(data)
         elif data['type']=='gl3d':
             img0, img1, pix_pos0, pix_pos1, H, scale_offset, rotate_offset = self.decode_gl3d(data)
         else:
             raise NotImplementedError
-        # print('gt cost {} s'.format(time.time()-begin))
-        # self.times[0]+=time.time()-begin
 
-        # begin=time.time()
         if self.args['augment']:
             img0 = self.augment(img0)
             img1 = self.augment(img1)
 
-        # print('ag cost {} s'.format(time.time()-begin))
-        # self.times[1] += time.time() - begin
-        # begin=time.time()
         results0=self.transformer.transform(img0, pix_pos0, output_grid=True)
         results1=self.transformer.transform(img1, pix_pos1, output_grid=True)
-        # print('transform cost {} s'.format(time.time()-begin))
-        # self.times[2] += time.time() - begin
 
-        # begin=time.time()
         img_list0,pts_list0,grid_list0=self.transformer.postprocess_transformed_imgs(results0, True)
         img_list1,pts_list1,grid_list1=self.transformer.postprocess_transformed_imgs(results1, True)
 
-        pix_pos0=torch.tensor(pix_pos0,dtype=torch.float32)
-        pix_pos1=torch.tensor(pix_pos1,dtype=torch.float32)
+        # note!!! since the grid is offset by a random grid_begins, so here we substract it
+        pix_pos0=torch.tensor(pix_pos0-results0['grid_begins'][None,:],dtype=torch.float32)
+        pix_pos1=torch.tensor(pix_pos1-results1['grid_begins'][None,:],dtype=torch.float32)
         scale_offset=torch.tensor(scale_offset,dtype=torch.int32)
         rotate_offset=torch.tensor(rotate_offset,dtype=torch.int32)
         H=torch.tensor(H,dtype=torch.float32)
-        # print('totensor cost {} s'.format(time.time()-begin))
-        # self.times[3] += time.time() - begin
 
         return img_list0,pts_list0,pix_pos0,grid_list0,img_list1,pts_list1,pix_pos1,grid_list1,scale_offset,rotate_offset,H
 
@@ -165,7 +145,6 @@ class CorrespondenceDataset(Dataset):
     def get_homography_correspondence(self, h, w, th, tw, H):
         coords = [np.expand_dims(item, 2) for item in np.meshgrid(np.arange(w), np.arange(h))]
         coords = np.concatenate(coords, 2).astype(np.float32)
-        if self.args['perturb']: coords += np.random.randint(0, self.args['perturb_max'] + 1, coords.shape)
         coords_target = cv2.perspectiveTransform(np.reshape(coords, [1, -1, 2]), H.astype(np.float32))
         coords_target = np.reshape(coords_target, [h, w, 2])
 
@@ -180,13 +159,20 @@ class CorrespondenceDataset(Dataset):
         val_msk = []
 
         if self.args['test_harris']:
-            smooth_img=cv2.GaussianBlur(img,(5,5),1.5)
-            if np.random.random()>0.8:
-                harris_img = cv2.cornerHarris(cv2.cvtColor(smooth_img, cv2.COLOR_RGB2GRAY).astype(np.float32), 2, 3, 0.04)
-            else:
-                harris_img = cv2.cornerHarris(cv2.cvtColor(smooth_img, cv2.COLOR_RGB2GRAY).astype(np.float32), 4, 5, 0.04)
+            harris_img = cv2.cornerHarris(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY).astype(np.float32), 2, 3, 0.04)
             harris_msk = harris_img > np.percentile(harris_img.flatten(), self.args['harris_percentile'])
             val_msk.append(harris_msk)
+
+        if self.args['test_edge']:
+            edge_thresh = self.args['edge_thresh']
+            edge_msk = np.ones_like(msk)
+            edge_msk[:edge_thresh, :] = False
+            edge_msk[:, :edge_thresh] = False
+            edge_msk[h - edge_thresh:h, :] = False
+            edge_msk[:, w - edge_thresh:w] = False
+            edge_msk=np.logical_and(edge_msk,np.logical_and(pix_pos[:,:,0]<w-edge_thresh, pix_pos[:,:,0]>edge_thresh))
+            edge_msk=np.logical_and(edge_msk,np.logical_and(pix_pos[:,:,1]<h-edge_thresh, pix_pos[:,:,1]>edge_thresh))
+            msk = np.logical_and(msk, edge_msk)
 
         if len(val_msk) == 0:
             val_msk = np.ones_like(msk)
@@ -214,6 +200,12 @@ class CorrespondenceDataset(Dataset):
         else: th,tw=h,w
         pix_pos, msk = self.get_homography_correspondence(h, w, th, tw, H)
         pix_pos0, pix_pos1 = self.sample_correspondence(img, pix_pos, msk)
+
+        if self.args['perturb']:
+            lower, upper = -self.args['perturb_max'], self.args['perturb_max']
+            mu, sigma = 0, self.args['perturb_max']/2
+            X = stats.truncnorm((lower - mu) / sigma, (upper - mu) / sigma, loc=mu, scale=sigma)
+            pix_pos1 += X.rvs(pix_pos1.shape)
         return pix_pos0, pix_pos1
 
     @staticmethod
@@ -261,13 +253,7 @@ class CorrespondenceDataset(Dataset):
         return bpth
 
     def generate_homography(self):
-        # return np.asarray([[2.0,0.0,0.0],[0.0,2.0,0.0],[0.0,0.0,1.0]],dtype=np.float32)
-        # return np.asarray([[0.5,0.0,0.0],[0.0,0.5,0.0],[0.0,0.0,1.0]],dtype=np.float32)
-        # m=np.identity(3)
-        # m[:2,:2]=get_rot_m(-np.pi/4)
-        # m[:2,:2]*=0.5
-        # return m
-        return sample_homography_v2(self.args['h'],self.args['w'])
+        return sample_homography(self.args['h'], self.args['w'])
 
     def augment(self, img):
         # ['jpeg','blur','noise','jitter','none']
@@ -283,7 +269,7 @@ class CorrespondenceDataset(Dataset):
         return img
 
     def compute_scale_rotate_offset(self, H, pix_pos0):
-        As=compute_similar_affine_batch(H,pix_pos0)
+        As=compute_approximated_affine_batch(H, pix_pos0)
         scale=np.sqrt(np.linalg.det(As))
         Us,_,Vs=np.linalg.svd(As)
         R=Us@Vs

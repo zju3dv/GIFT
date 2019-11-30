@@ -1,0 +1,23 @@
+name: GIFT-R-stage2
+
+default_config: "configs/GIFT-stage1.yaml"
+
+sample_scale_begin: 0
+sample_scale_inter: 0.5
+sample_scale_num: 5
+sample_rotate_begin: -180
+sample_rotate_inter: 45
+sample_rotate_num: 8
+
+embedder: "BilinearRotationGCNN"
+
+pretrain: true
+pretrain_model_path: "data/model/GIFT-stage1"
+pretrain_step: -1
+pretrain_extractor: true
+pretrain_embedder: false
+
+train_embedder: true
+train_extractor: false
+
+loss_type: "gefeats"

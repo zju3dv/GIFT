@@ -7,7 +7,6 @@ setup(
         CUDAExtension('hard_example_mining', [
             './src/hard_example_mining.cpp',
             './src/hard_example_mining_kernel.cu',
-            './src/knncuda.cu'
         ], libraries=['cublas',])
     ],
     cmdclass={

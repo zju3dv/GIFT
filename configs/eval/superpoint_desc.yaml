@@ -1,0 +1,2 @@
+type: superpoint
+weights_path: "data/superpoint/superpoint_v1.pth"

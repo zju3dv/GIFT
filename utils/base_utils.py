@@ -101,7 +101,7 @@ def get_img_patch(img,pt,size):
     xmax=min(w-1,x+size)
     ymin=max(0,y-size)
     ymax=min(h-1,y+size)
-    patch=np.zeros([size*2,size*2,3],np.uint8)
+    patch=np.full([size*2,size*2,3],127,np.uint8)
     patch[ymin-y+size:ymax-y+size,xmin-x+size:xmax-x+size]=img[ymin:ymax,xmin:xmax]
     return patch
 
@@ -137,3 +137,49 @@ def equal_hist(img):
     else:
         img=cv2.equalizeHist(img)
     return img
+
+
+def draw_correspondence(img0, img1, kps0, kps1, matches, colors=None):
+    h0, w0 = img0.shape[:2]
+    h1, w1 = img1.shape[:2]
+    h = max(h0, h1)
+    w = w0 + w1
+    out_img = np.zeros([h, w, 3], np.uint8)
+    out_img[:h0, :w0] = img0
+    out_img[:h1, w0:] = img1
+
+    for pt in kps0:
+        pt = np.round(pt).astype(np.int32)
+        cv2.circle(out_img, tuple(pt), 1, (255, 0, 0), -1)
+
+    for pt in kps1:
+        pt = np.round(pt).astype(np.int32)
+        pt = pt.copy()
+        pt[0] += w0
+        cv2.circle(out_img, tuple(pt), 1, (255, 0, 0), -1)
+
+    for mi,m in enumerate(matches):
+        pt = np.round(kps0[m[0]]).astype(np.int32)
+        pr_pt = np.round(kps1[m[1]]).astype(np.int32)
+        pr_pt[0] += w0
+        if colors is None:
+            cv2.line(out_img, tuple(pt), tuple(pr_pt), (0, 255, 0), 1)
+        elif type(colors)==list:
+            color=(int(c) for c in colors[mi])
+            cv2.line(out_img, tuple(pt), tuple(pr_pt), color, 1)
+        else:
+            color=(int(c) for c in colors)
+            cv2.line(out_img, tuple(pt), tuple(pr_pt), color, 1)
+
+    return out_img
+
+def draw_keypoints(img,kps,colors=None,radius=2):
+    out_img=img.copy()
+    for pi, pt in enumerate(kps):
+        pt = np.round(pt).astype(np.int32)
+        if colors is not None:
+            color=[int(c) for c in colors[pi]]
+            cv2.circle(out_img, tuple(pt), radius, color, -1)
+        else:
+            cv2.circle(out_img, tuple(pt), radius, (255,0,0), -1)
+    return out_img

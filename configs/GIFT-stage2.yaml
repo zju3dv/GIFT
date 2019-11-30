@@ -1,0 +1,14 @@
+name: GIFT-stage2
+
+default_config: "configs/GIFT-stage1.yaml"
+
+pretrain: true
+pretrain_model_path: "data/model/GIFT-stage1"
+pretrain_step: -1
+pretrain_extractor: true
+pretrain_embedder: false
+
+train_embedder: true
+train_extractor: false
+
+loss_type: "gefeats"
