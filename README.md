@@ -139,13 +139,13 @@ data
 mkdir data/record
 python run.py --task=train --cfg=configs/GIFT-stage1.yaml # train group extractor (Vanilla CNN)
 python run.py --task=train --cfg=configs/GIFT-stage2.yaml # train group embedder (Group CNNs)
-``` 
+```
 
 ## Acknowledgements
 
 We have used codes or datasets from following projects:
 - [HPatches](https://github.com/hpatches/hpatches-dataset): Homography-patches dataset
-- [GeoDesc](https://github.com/lzx551402/geodesc): Learning Local Descriptors by Integrating Geometry Constraints
-- [SuperPoint](https://github.com/MagicLeapResearch/SuperPointPretrainedNetwork): Self-Supervised Interest Point Detection and Description and [its tensorflow version](https://github.com/rpautrat/SuperPoint)
+- [GeoDesc](https://github.com/lzx551402/geodesc): Learning Local Descriptors by Integrating Geometry Constraints (code in [opencvhelper.py](utils/opencvhelper.py))
+- [SuperPoint](https://github.com/MagicLeapResearch/SuperPointPretrainedNetwork): Self-Supervised Interest Point Detection (code in [superpoint_utils.py](utils/superpoint_utils.py)) and Description and [its tensorflow version](https://github.com/rpautrat/SuperPoint)
 - [GL3D](https://github.com/lzx551402/GL3D): a large-scale database created for 3D reconstruction and geometry-related learning problems
 - [Learning to Find Good Correspondences](https://github.com/vcg-uvic/learned-correspondence-release)
