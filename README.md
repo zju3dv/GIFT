@@ -3,7 +3,7 @@
 > NeurIPS 2019
 > [Project Page](https://zju3dv.github.io/GIFT/)
 
-Any questions or discussions are welcomed!
+![GIFT Demo](demo/gift_sr_demo.gif)
 
 ## Requirements & Compilation
 1. Requirements
